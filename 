@@ -1,0 +1,41 @@
+[33mcommit 341e07610748af9bf2b63986ba645ced19dbe1a7[m[33m ([m[1;36mHEAD -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m
+Author: Malgorzata Victor <malgorzatavictor@gmail.com>
+Date:   Wed Apr 1 21:57:55 2026 +0100
+
+    Updated lambda to persist uploads to DynamoDB.
+
+[33mcommit 6639fff5e4d3490263ee0f0f2b2cf8995bcc4c63[m
+Author: Malgorzata Victor <malgorzatavictor@gmail.com>
+Date:   Wed Apr 1 21:44:11 2026 +0100
+
+    Completed Fan out implementation - added emailing logic
+
+[33mcommit d9021d0341955b281cf2f39e1214b1240e558e47[m
+Author: Malgorzata Victor <malgorzatavictor@gmail.com>
+Date:   Tue Mar 31 20:57:47 2026 +0100
+
+    Started Fan out for S3 image upload.
+
+[33mcommit 446a3052d101398036fd65257bed215705393c09[m
+Author: Malgorzata Victor <malgorzatavictor@gmail.com>
+Date:   Tue Mar 31 20:50:27 2026 +0100
+
+    Signup resource
+
+[33mcommit 630801d5ec65498541394d3c0d18343ff2d8ed85[m
+Author: Diarmuid O Connor <doconnor@wit.ie>
+Date:   Mon Mar 9 08:10:10 2026 +0000
+
+    Update dependencies
+
+[33mcommit d24933908ed0e7090f23de2f62f149897bad416a[m
+Author: Diarmuid O Connor <doconnor@wit.ie>
+Date:   Mon Nov 4 15:54:35 2024 +0000
+
+    Update dependencies
+
+[33mcommit 5a74cbea623ce476faa1df37ba911ca12c0c1782[m
+Author: Diarmuid O Connor <doconnor@wit.ie>
+Date:   Mon Nov 20 09:06:29 2023 +0000
+
+    Initial structure

@@ -11,7 +11,6 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 
 import { Construct } from "constructs";
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
 
 export class EDAAppStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -24,32 +23,31 @@ export class EDAAppStack extends cdk.Stack {
       tableName: "Imagess",
     });
 
-
     const imagesBucket = new s3.Bucket(this, "images", {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       publicReadAccess: false,
     });
 
-    // Integration infrastructure
-
-    const imageProcessQueue = new sqs.Queue(this, "img-process-q", {
+    const dlq = new sqs.Queue(this, "img-dlq", {
       receiveMessageWaitTime: cdk.Duration.seconds(10),
+    });
+
+    const imageProcessQueue = new sqs.Queue(this, "img-created-queue", {
+      receiveMessageWaitTime: cdk.Duration.seconds(10),
+      deadLetterQueue: {
+        queue: dlq,
+        maxReceiveCount: 1,
+      },
     });
 
     const newImageTopic = new sns.Topic(this, "NewImageTopic", {
       displayName: "New Image topic",
     });
 
-
-
     const mailerQ = new sqs.Queue(this, "mailer-q", {
       receiveMessageWaitTime: cdk.Duration.seconds(10),
     });
-
-
-
-    // Lambda functions
 
     const persistImageDataFn = new lambdanode.NodejsFunction(
       this,
@@ -62,25 +60,12 @@ export class EDAAppStack extends cdk.Stack {
         environment: {
           TABLE_NAME: imagesTable.tableName,
           BUCKET_NAME: imagesBucket.bucketName,
-          REGION: 'eu-west-1'
+          REGION: "eu-west-1",
         },
       }
     );
 
     imagesTable.grantReadWriteData(persistImageDataFn);
-
-
-    // S3 --> SQS
-    imagesBucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED,
-      new s3n.SnsDestination(newImageTopic)  // Changed
-    );
-
-    newImageTopic.addSubscription(
-      new subs.SqsSubscription(imageProcessQueue)
-    );
-
-
 
     const mailerFn = new lambdanode.NodejsFunction(this, "mailer", {
       runtime: lambda.Runtime.NODEJS_16_X,
@@ -89,19 +74,34 @@ export class EDAAppStack extends cdk.Stack {
       entry: `${__dirname}/../lambdas/mailer.ts`,
     });
 
+    const rejectedFileFn = new lambdanode.NodejsFunction(
+      this,
+      "RejectedFileFn",
+      {
+        runtime: lambda.Runtime.NODEJS_20_X,
+        entry: `${__dirname}/../lambdas/rejectedFile.ts`,
+        timeout: cdk.Duration.seconds(15),
+        memorySize: 128,
+      }
+    );
+
+    imagesBucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.SnsDestination(newImageTopic)
+    );
+
+    newImageTopic.addSubscription(
+      new subs.SqsSubscription(imageProcessQueue)
+    );
+
     newImageTopic.addSubscription(new subs.SqsSubscription(mailerQ));
 
-
-
-
-    // SQS --> Lambda
     const newImageEventSource = new events.SqsEventSource(imageProcessQueue, {
       batchSize: 5,
       maxBatchingWindow: cdk.Duration.seconds(5),
     });
 
     persistImageDataFn.addEventSource(newImageEventSource);
-
 
     const newImageMailEventSource = new events.SqsEventSource(mailerQ, {
       batchSize: 5,
@@ -110,8 +110,12 @@ export class EDAAppStack extends cdk.Stack {
 
     mailerFn.addEventSource(newImageMailEventSource);
 
+    const rejectedFileEventSource = new events.SqsEventSource(dlq, {
+      batchSize: 5,
+      maxBatchingWindow: cdk.Duration.seconds(10),
+    });
 
-    // Permissions
+    rejectedFileFn.addEventSource(rejectedFileEventSource);
 
     imagesBucket.grantRead(persistImageDataFn);
 
@@ -126,10 +130,6 @@ export class EDAAppStack extends cdk.Stack {
         resources: ["*"],
       })
     );
-
-
-
-    // Output
 
     new cdk.CfnOutput(this, "bucketName", {
       value: imagesBucket.bucketName,
