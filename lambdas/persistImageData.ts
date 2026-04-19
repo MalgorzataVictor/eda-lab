@@ -1,40 +1,44 @@
 import { SQSHandler } from "aws-lambda";
-import {
-  GetObjectCommand,
-  PutObjectCommandInput,
-  GetObjectCommandInput,
-  S3Client,
-  PutObjectCommand,
-} from "@aws-sdk/client-s3";
-
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
-
-const s3 = new S3Client();
 
 const ddbDocClient = createDDbDocClient();
 
 export const handler: SQSHandler = async (event) => {
   console.log("Event ", JSON.stringify(event));
+
   for (const record of event.Records) {
     const recordBody = JSON.parse(record.body);
-    const snsMessage = JSON.parse(recordBody.Message);
-    if (snsMessage.Records) {
-      for (const s3Message of recordBody.Records) {
+
+    let s3Records;
+
+    if (recordBody.Message) {
+      const snsMessage = JSON.parse(recordBody.Message);
+      s3Records = snsMessage.Records;
+    } else {
+      s3Records = recordBody.Records;
+    }
+
+    if (s3Records) {
+      for (const s3Message of s3Records) {
         const s3e = s3Message.s3;
+
         const srcKey = decodeURIComponent(
           s3e.object.key.replace(/\+/g, " ")
         );
 
         const typeMatch = srcKey.match(/\.([^.]*)$/);
         if (!typeMatch) {
-          console.log("Could not determine the image type.");
-          throw new Error("Could not determine the image type. ");
+          throw new Error("Could not determine the image type.");
         }
 
         const imageType = typeMatch[1].toLowerCase();
-        if (imageType != "jpeg" && imageType != "png") {
-          throw new Error(`Unsupported image type: ${imageType}.`);
+        if (
+          imageType !== "jpeg" &&
+          imageType !== "jpg" &&
+          imageType !== "png"
+        ) {
+          throw new Error(`Unsupported image type: ${imageType}`);
         }
 
         await ddbDocClient.send(
@@ -52,14 +56,15 @@ export const handler: SQSHandler = async (event) => {
 
 function createDDbDocClient() {
   const ddbClient = new DynamoDBClient({ region: process.env.REGION });
-  const marshallOptions = {
-    convertEmptyValues: true,
-    removeUndefinedValues: true,
-    convertClassInstanceToMap: true,
-  };
-  const unmarshallOptions = {
-    wrapNumbers: false,
-  };
-  const translateConfig = { marshallOptions, unmarshallOptions };
-  return DynamoDBDocumentClient.from(ddbClient, translateConfig);
+
+  return DynamoDBDocumentClient.from(ddbClient, {
+    marshallOptions: {
+      convertEmptyValues: true,
+      removeUndefinedValues: true,
+      convertClassInstanceToMap: true,
+    },
+    unmarshallOptions: {
+      wrapNumbers: false,
+    },
+  });
 }
